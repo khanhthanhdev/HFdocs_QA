@@ -1,12 +1,9 @@
 import streamlit as st
 from llama_index.llms.gemini import Gemini
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
-from llama_index.embeddings.google import GooglePaLMEmbedding
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from dotenv import load_dotenv
 import os
-import time
-import random
 
 # Load environment variables and configure settings
 load_dotenv()
@@ -22,28 +19,9 @@ def configure_llm():
 
 llm = configure_llm()
 
-# Exponential backoff for GooglePaLMEmbedding
-def exponential_backoff_embedding(max_retries=5, max_backoff=64):
-    def get_wait_time(attempt):
-        random_milliseconds = random.randint(0, 1000) / 1000.0
-        wait_time = min((2 ** attempt) + random_milliseconds, max_backoff)
-        return wait_time
-
-    attempt = 0
-    while attempt < max_retries:
-        try:
-            embed_model = GooglePaLMEmbedding(model_name="models/embedding-gecko-001", api_key=GOOGLE_API_KEY)
-            # Test the embedding model to check if quota is available
-            embed_model.get_text_embedding("test")
-            return embed_model
-        except Exception as e:
-            print(f"Google PaLM quota exhausted or error occurred: {e}. Retrying...")
-            wait_time = get_wait_time(attempt)
-            print(f"Waiting for {wait_time:.2f} seconds before retrying...")
-            time.sleep(wait_time)
-            attempt += 1
-
-    print("Max retries reached. Falling back to HuggingFace embeddings.")
+# Configure local embedding model
+@st.cache_resource
+def configure_embedding_model():
     return HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
 # Load and index data
@@ -52,7 +30,7 @@ def load_data():
     with st.spinner(text="Loading and indexing the HuggingFace docs – hang tight! This should take 1-2 minutes."):
         reader = SimpleDirectoryReader(input_dir="./data", recursive=True)
         docs = reader.load_data()
-        embed_model = exponential_backoff_embedding()
+        embed_model = configure_embedding_model()
         return VectorStoreIndex.from_documents(docs, embed_model=embed_model)
 
 # Initialize session state
