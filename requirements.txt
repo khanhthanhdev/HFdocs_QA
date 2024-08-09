@@ -1,6 +1,6 @@
+
 llama_index
-streamlit
-dotenv
 llama-index-llms-gemini
 llama_index.embeddings.huggingface 
 llama_index.embeddings.google
+python-dotenv
